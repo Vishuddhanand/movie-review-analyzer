@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ReviewLens – movie review sentiment analysis</title>
+  <meta name="description" content="Paste a movie review and see whether it is positive or negative, which words decided it, and a full NLP breakdown.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <div>
+          <h1>ReviewLens</h1>
+          <p>Is this movie review positive or negative, and why?</p>
+        </div>
+      </div>
+      <nav class="tabs" role="tablist" aria-label="Sections">
+        <button role="tab" class="tab" data-view="analyze" aria-selected="true">Analyze a review</button>
+        <button role="tab" class="tab" data-view="batch" aria-selected="false">Analyze a CSV</button>
+        <button role="tab" class="tab" data-view="model" aria-selected="false">About the model</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- ============================== ANALYZE ============================== -->
+    <section id="view-analyze" class="view" role="tabpanel">
+      <div class="analyze-grid">
+
+        <div class="composer">
+          <label for="review-input" class="field-label">Movie review</label>
+          <textarea id="review-input" rows="9" maxlength="{{ max_chars }}"
+                    placeholder="Paste or type a review. For example: “The acting was superb, but the second half dragged and the ending felt rushed.”"></textarea>
+          <div class="composer-meta">
+            <span id="char-count">0 / {{ max_chars }}</span>
+            <span class="hint">Ctrl + Enter to analyze</span>
+          </div>
+          <div class="composer-actions">
+            <button id="analyze-btn" class="btn primary" type="button">Analyze review</button>
+            <button id="sample-btn" class="btn" type="button">Try a sample review</button>
+            <button id="clear-btn" class="btn quiet" type="button">Clear</button>
+          </div>
+          <p id="analyze-error" class="error" role="alert" hidden></p>
+        </div>
+
+        <div class="verdict" id="verdict" aria-live="polite">
+          <div class="empty">
+            <p class="empty-title">Your verdict appears here</p>
+            <p>Add a review and press <strong>Analyze review</strong>. You get the verdict, how sure the model is, and every word shaded by how it moved the result.</p>
+          </div>
+        </div>
+      </div>
+
+      <section id="annotated" class="annotated" hidden>
+        <div class="section-head">
+          <h2>The review, word by word</h2>
+          <ul class="legend" aria-label="Legend">
+            <li><span class="swatch pos"></span>Raises positive</li>
+            <li><span class="swatch neg"></span>Raises negative</li>
+            <li><span class="swatch none"></span>No effect</li>
+          </ul>
+        </div>
+        <p id="annotated-text" class="annotated-text"></p>
+        <p class="note">Shading shows how much each word, together with the phrase around it, moved the model’s score. Darker means a stronger push. Hover a word for its exact weight.</p>
+      </section>
+
+      <section id="toolkit" class="toolkit" hidden>
+        <div class="section-head">
+          <h2>Language breakdown</h2>
+          <div class="subtabs" role="tablist" aria-label="Language breakdown">
+            <button role="tab" class="subtab" data-sub="overview" aria-selected="true">Overview</button>
+            <button role="tab" class="subtab" data-sub="roots" aria-selected="false">Tokens and roots</button>
+            <button role="tab" class="subtab" data-sub="pos" aria-selected="false">Parts of speech</button>
+            <button role="tab" class="subtab" data-sub="entities" aria-selected="false">Names</button>
+            <button role="tab" class="subtab" data-sub="phrases" aria-selected="false">Common phrases</button>
+          </div>
+        </div>
+        <div id="sub-overview" class="subview"></div>
+        <div id="sub-roots" class="subview" hidden></div>
+        <div id="sub-pos" class="subview" hidden></div>
+        <div id="sub-entities" class="subview" hidden></div>
+        <div id="sub-phrases" class="subview" hidden></div>
+      </section>
+    </section>
+
+    <!-- ============================== BATCH ============================== -->
+    <section id="view-batch" class="view" role="tabpanel" hidden>
+      <div class="batch-intro">
+        <h2>Score many reviews at once</h2>
+        <p>Upload a CSV with one review per row. The column can be called <code>review</code>, <code>text</code>, <code>comment</code> or <code>content</code>; otherwise the first column is used. If the file also has a <code>sentiment</code> column (positive/negative), you also get the model’s accuracy on your data. The first 500 rows are scored.</p>
+      </div>
+
+      <label class="dropzone" id="dropzone" for="csv-input">
+        <input id="csv-input" type="file" accept=".csv,text/csv">
+        <span class="drop-title" id="drop-title">Choose a CSV file</span>
+        <span class="drop-sub">or drop it here. Up to 2 MB.</span>
+      </label>
+      <p class="batch-links"><a href="{{ url_for('static', filename='example_reviews.csv') }}" download>Download an example CSV</a></p>
+      <p id="batch-error" class="error" role="alert" hidden></p>
+      <div id="batch-result" hidden></div>
+    </section>
+
+    <!-- ============================== MODEL ============================== -->
+    <section id="view-model" class="view" role="tabpanel" hidden>
+      <div id="model-content"><p class="muted">Loading model details…</p></div>
+    </section>
+
+  </main>
+
+  <footer class="foot">
+    <p>Trained on the IMDB 50K movie review dataset. Predictions come from a Logistic Regression model on TF-IDF features. It reads word patterns, not meaning, so sarcasm and subtle negation can fool it.</p>
+  </footer>
+
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</body>
+</html>
